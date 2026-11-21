@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light only">
+<title>크롬으로 열기 · 전기기능사 공부</title>
+<link rel="icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#EAEAEA;--ink:#1f2937;--muted:#6b7280}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:17px}
+main{max-width:30rem;margin:0 auto;padding:40px 16px;display:flex;flex-direction:column;gap:12px;text-align:center}
+.card{background:#fff;border-radius:1.4rem;box-shadow:0 10px 15px -3px rgb(0 0 0 / .1);padding:20px}
+h1{margin:0;font-size:1.5rem}
+p{margin:8px 0 0;line-height:1.6;color:var(--muted);font-size:.95rem}
+a.btn{display:block;border-radius:14px;padding:15px 12px;font-weight:800;text-decoration:none;font-size:1.05rem}
+.chrome{background:#2563eb;color:#fff}.plain{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px #d1d5db}
+small{display:block;font-weight:400;font-size:.8rem;opacity:.9;margin-top:2px}
+</style>
+</head>
+<body>
+<main>
+  <div class="card"><div style="font-size:2.6rem">⚡</div><h1>전기기능사 공부</h1><p id="msg">크롬으로 여는 중이에요…</p></div>
+  <a class="btn chrome" id="goChrome" href="./">🌐 크롬으로 열기<small>자동으로 안 넘어가면 눌러 주세요</small></a>
+  <a class="btn plain" id="goHere" href="./">이 화면에서 그냥 열기</a>
+  <p id="tip"></p>
+</main>
+<script>
+/* 카톡 등 앱 안 브라우저에서 이 주소를 누르면 크롬으로 넘겨 준다.
+   안드로이드: intent 주소로 크롬 실행(없으면 그대로 열기) / 아이폰·아이패드: googlechromes:// 로 크롬 앱 실행 */
+(function () {
+  var app = location.href.split('#')[0].split('?')[0].replace(/open\.html$/, '');
+  var hostPath = app.replace(/^https?:\/\//, '');
+  var ua = navigator.userAgent;
+  var android = /Android/i.test(ua);
+  var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var inApp = /KAKAOTALK|NAVER|Line\/|FBAN|FBAV|Instagram|SamsungBrowser|DaumApps|Whale/i.test(ua);
+  var isChrome = (android && /Chrome\//.test(ua) && !inApp) || (ios && /CriOS/.test(ua));
+  var chromeURL = android
+    ? 'intent://' + hostPath + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(app) + ';end'
+    : ios ? 'googlechromes://' + hostPath : app;
+  document.getElementById('goChrome').href = chromeURL;
+  document.getElementById('goHere').href = app;
+  var tip = document.getElementById('tip');
+  if (ios) tip.innerHTML = '아이폰·아이패드에 크롬이 없으면 아래 <b>이 화면에서 그냥 열기</b>를 누르거나, 사파리로 열어 주세요.<br>홈 화면에 추가는 사파리(또는 크롬)의 공유 버튼에서 할 수 있어요.';
+  else if (android) tip.innerHTML = '크롬이 없으면 지금 브라우저에서 그대로 열려요.';
+  if (isChrome || (!android && !ios)) { document.getElementById('msg').textContent = '앱을 여는 중이에요…'; location.replace(app); return; }
+  location.href = chromeURL;
+  setTimeout(function () { document.getElementById('msg').textContent = '크롬이 안 열렸다면 아래 버튼을 눌러 주세요.'; }, 1800);
+})();
+</script>
+</body>
+</html>
