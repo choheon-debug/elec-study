@@ -207,6 +207,9 @@ sub,sup{font-size:.72em}
 .book figure{margin:12px 0;text-align:center}.book figure img{max-width:100%;height:auto;border-radius:8px;background:#fff}
 .bx.기출{background:#fef2f2;border:1px solid #fecaca}.bx.기출 .k{background:#ef4444}
 .bx.풀이{background:#fffbeb;border:1px solid #fde68a}.bx.풀이 .k{background:#d97706}
+.bx.핵심{background:#fff1f2;border:1px solid #fecdd3}.bx.핵심 .k{background:#e11d48}
+.bx.최신{background:#f5f3ff;border:1px solid #ddd6fe}.bx.최신 .k{background:#7c3aed}
+.bx.기출{background:#fff7ed;border:1px solid #fed7aa}.bx.기출 .k{background:#ea580c}
 .subj{grid-template-columns:5.6rem minmax(0,1fr) 3rem}
 .hl-y{background:#fde047!important;color:var(--ink)!important}.hl-p{background:#f9a8d4!important;color:var(--ink)!important}.hl-g{background:#86efac!important;color:var(--ink)!important}.hl-b{background:#93c5fd!important;color:var(--ink)!important}
 .hlbar .btn{padding:11px 10px}.hlc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
@@ -304,11 +307,24 @@ const SUBJ_PART = { T: 0, M: 1, I: 2 };
 const def = () => ({ q: {}, star: [], cards: {}, done: {}, day: { d: "", n: 0 }, set: { exam: "", goal: 20, rate: 1, voice: "" }, mocks: [], my: [], hl: {}, memo: {} });
 let S = def();
 try { const raw = localStorage.getItem(KEY); if (raw) { S = Object.assign(def(), JSON.parse(raw)); S.set = Object.assign(def().set, S.set); } } catch {}
+/* 교재가 2026.11.22 판으로 바뀌며 절 안의 글 순서가 달라졌어요. 예전 하이라이트·메모(b과목-절:블록)를 새 자리로 옮겨요. */
+function migrateBook() {
+  if (S.bv === 2) return;
+  const isB = k => /^b\d+-\d+:\d+$/.test(k), has = ["hl", "hlr", "memo"].some(k => Object.keys(S[k] || {}).some(isB));
+  if (!has) { S.bv = 2; save(); return; }
+  const run = () => { const M = window.MIG2?.b; if (!M) return;
+    ["hl", "hlr", "memo"].forEach(k => { const o = S[k]; if (!o) return; const n = {};
+      for (const [key, v] of Object.entries(o)) { const m = key.match(/^b(\d+-\d+):(\d+)$/), to = m && M[m[1]]?.[m[2]]; n[m && to != null ? `b${m[1]}:${to}` : key] = v; }
+      S[k] = n; });
+    S.bv = 2; save(); };
+  if (window.MIG2) return run();
+  const sc = document.createElement("script"); sc.src = "migrate.js"; sc.onload = run; document.head.appendChild(sc);
+}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast("저장 공간이 꽉 찼어요"); } }
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 /** 글 속의 아래첨자(X_L)·위첨자(^x)를 예쁘게 */
-const fm = s => esc(s).replace(/_([A-Za-z0-9]{1,3})/g, "<sub>$1</sub>").replace(/\^([A-Za-z0-9]{1,3})/g, "<sup>$1</sup>");
+const fm = s => esc(s).replace(/_([A-Za-z0-9]{1,3})/g, "<sub>$1</sub>").replace(/\^\(([^()]{1,12})\)/g, "<sup>$1</sup>").replace(/\^([0-9.]+[0-9]|[A-Za-z0-9]{1,3})/g, "<sup>$1</sup>");
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const WQ = window.WQ, WBY = Object.fromEntries(WQ.map(q => [q.id, q]));
@@ -444,8 +460,8 @@ function wireHead(backArg) {
   $("#view").querySelector("[data-back]")?.addEventListener("click", e => go(e.currentTarget.dataset.back, backArg));
 }
 const dday = d => d ? Math.ceil((new Date(d + "T00:00:00") - new Date(today() + "T00:00:00")) / 864e5) : null;
-function nextSection(B) { for (let p = 0; p < B.length; p++) for (let i = 0; i < B[p].s.length; i++) if (!S.done[`${p}-${i}`]) return { p, i, P: B[p], s: B[p].s[i] }; return null; }
-function roadPct(B) { let d = 0, n = 0; B.forEach((P, p) => P.s.forEach((_, i) => { n++; if (S.done[`${p}-${i}`]) d++; })); return n ? Math.round(d / n * 100) : 0; }
+function nextSection(B) { for (let p = 0; p < B.length; p++) if (B[p].n) for (let i = 0; i < B[p].s.length; i++) if (!S.done[`${p}-${i}`]) return { p, i, P: B[p], s: B[p].s[i] }; return null; }
+function roadPct(B) { let d = 0, n = 0; B.forEach((P, p) => P.n && P.s.forEach((_, i) => { n++; if (S.done[`${p}-${i}`]) d++; })); return n ? Math.round(d / n * 100) : 0; }
 /** 교재 절 이름의 낱말이 문제에 나오면 그 절의 문제로 본다 */
 function qsForSection(p, i, B) {
   const s = Object.keys(SUBJ_PART).find(k => SUBJ_PART[k] === p), all = WQ.filter(q => q.s === s);
@@ -469,6 +485,7 @@ function viewHome() {
     <div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, n / goal * 100)}%;background:var(--acc)"></i></div>
   </section>
   <button class="btn b-acc" id="hToday">🎯 오늘의 문제 풀기<small>틀린 것·안 푼 것 먼저</small></button>
+  <button class="btn b-purple" id="hNews">📌 2027년 시험·KEC 개정 안내<small>새 출제기준 · 아크 차단기 · 접지도체 16[mm²] (2026.11.22 기준)</small></button>
   <div class="g2"><button class="btn b-blue" id="hMock">📝 모의고사 10회<small>60문항 · 60분</small></button>
   <button class="btn b-orange" id="hWrong" ${w ? "" : "disabled"}>❌ 오답 노트<small>${w}문제</small></button></div>
   <button class="btn b-purple" id="hListen">🎧 듣기 공부<small>기출 포인트 · 문제 · 암기카드</small></button>
@@ -479,6 +496,7 @@ function viewHome() {
   ${S.mocks.length ? `<section class="card"><div class="t">📝 최근 모의고사</div>${S.mocks.slice(-3).reverse().map(m => `<div class="row"><span class="main">${m.r ? m.r + "회" : "섞어서"} <span class="sm">${m.d.slice(5).replace("-", "/")} · ${m.min}분</span></span><b style="color:${m.score >= 60 ? "#15803d" : "#c2410c"}">${m.score}점 ${m.score >= 60 ? "합격" : "불합격"}</b></div>`).join("")}</section>` : ""}
   <p class="sm" style="text-align:center;line-height:1.6">「전기기능사 필기시험 이론편·문제집」 내용으로 만들었어요.<br>시험 직전에는 큐넷(q-net.or.kr) 공지를 꼭 확인하세요.</p>`;
   wireHead();
+  $("#hNews").onclick = () => go("section", { p: 3, i: 0 });
   $("#hToday").onclick = () => startW(todayW(), "🎯 오늘의 문제");
   $("#hMock").onclick = () => pickRound();
   $("#hWrong").onclick = () => startW(shuffle(wrongW()), "❌ 오답 노트");
@@ -665,25 +683,25 @@ function viewCards() {
 /* ---------- 📖 교재 ---------- */
 const nPts = s => s.b.filter(b => b.k === "기출 포인트").length;
 function viewBook() {
-  $("#view").innerHTML = head("📖 교재", "전기기능사 필기 이론편 · 3과목 59절") + `<button class="btn b-orange" id="bHl">🖍 하이라이트·📝 메모<small>칠한 곳 모아 보기·듣기</small></button><section class="card"><p class="sm">불러오는 중…</p></section>`;
+  $("#view").innerHTML = head("📖 교재", "이론편 3과목 59절 + 시험 안내 · 2026.11.22 판") + `<button class="btn b-orange" id="bHl">🖍 하이라이트·📝 메모<small>칠한 곳 모아 보기·듣기</small></button><section class="card"><p class="sm">불러오는 중…</p></section>`;
   wireHead();
   $("#bHl").onclick = openHl;
   loadBook().then(B => {
     if (tab !== "book") return;
     $("#view").querySelector(".card").outerHTML = B.map((P, p) => { const d = P.s.filter((_, i) => S.done[`${p}-${i}`]).length;
-      return `<button class="card sec" data-p="${p}" style="border:0"><span class="n ${d === P.s.length ? "done" : ""}">${d === P.s.length ? "✓" : `${d}/${P.s.length}`}</span><b>제${p + 1}과목 ${esc(P.t)}<br><span class="sm">${P.s.length}개 절 · 예제 ${P.s.reduce((a, s) => a + s.b.filter(b => b.k === "예제").length, 0)}개 · 기출 포인트 ${P.s.reduce((a, s) => a + nPts(s), 0)}개</span></b><span class="sm">›</span></button>`; }).join("");
+      return `<button class="card sec" data-p="${p}" style="border:0"><span class="n ${d === P.s.length ? "done" : ""}">${d === P.s.length ? "✓" : `${d}/${P.s.length}`}</span><b>${P.n ? `제${P.n}과목 ` : "📌 "}${esc(P.t)}<br><span class="sm">${P.s.length}개 절 · 예제 ${P.s.reduce((a, s) => a + s.b.filter(b => b.k === "예제").length, 0)}개 · 기출 포인트 ${P.s.reduce((a, s) => a + nPts(s), 0)}개</span></b><span class="sm">›</span></button>`; }).join("");
     $("#view").querySelectorAll("[data-p]").forEach(b => b.onclick = () => go("part", { p: +b.dataset.p }));
   }).catch(() => toast("교재를 불러오지 못했어요. 인터넷을 확인해 주세요"));
 }
 function viewPart(arg) {
   loadBook().then(B => {
     const P = B[arg.p];
-    $("#view").innerHTML = head(`제${arg.p + 1}과목`, esc(P.t), arg.from === "session" ? "session" : "book") + `
-    <section class="card">${P.s.map((s, i) => `<button class="sec" data-i="${i}"><span class="n ${S.done[`${arg.p}-${i}`] ? "done" : ""}">${S.done[`${arg.p}-${i}`] ? "✓" : s.n}</span><b>제${s.n}절 ${esc(s.t)}</b><span class="sm">›</span></button>`).join("")}</section>
-    <button class="btn b-acc" id="pQuiz">✏️ ${esc(P.t)} 문제 풀기 (200문제 중 20)</button>`;
+    $("#view").innerHTML = head(P.n ? `제${P.n}과목` : "📌 부록", esc(P.t), arg.from === "session" ? "session" : "book") + `
+    <section class="card">${P.s.map((s, i) => `<button class="sec" data-i="${i}"><span class="n ${S.done[`${arg.p}-${i}`] ? "done" : ""}">${S.done[`${arg.p}-${i}`] ? "✓" : s.n}</span><b>${P.n ? `제${s.n}절 ` : ""}${esc(s.t)}</b><span class="sm">›</span></button>`).join("")}</section>
+    ${P.n ? `<button class="btn b-acc" id="pQuiz">✏️ ${esc(P.t)} 문제 풀기 (200문제 중 20)</button>` : ""}`;
     wireHead();
     $("#view").querySelectorAll("[data-i]").forEach(b => b.onclick = () => go("section", { p: arg.p, i: +b.dataset.i }));
-    $("#pQuiz").onclick = () => startW(shuffle(qsForSection(arg.p)).slice(0, 20), `✏️ ${P.t}`);
+    $("#pQuiz") && ($("#pQuiz").onclick = () => startW(shuffle(qsForSection(arg.p)).slice(0, 20), `✏️ ${P.t}`));
   });
 }
 let secOnly = false;
@@ -704,14 +722,14 @@ function viewSection(arg) {
       return "";
     }).join("");
     const done = !!S.done[key];
-    $("#view").innerHTML = head(`제${s.n}절`, esc(s.t), "part") + `
+    $("#view").innerHTML = head(P.n ? `제${s.n}절` : "📌 부록", esc(s.t) + (s.sub ? `<br><span class="sm">${esc(s.sub)}</span>` : ""), "part") + `
     <div class="g2"><button class="btn b-purple" id="sListen">🔊 이 절 듣기</button><button class="btn ${secOnly ? "b-acc" : "b-gray"}" id="sOnly">${secOnly ? "✓ 기출 포인트만" : "🎯 기출 포인트만"}</button></div>
     ${hlBar()}
   <p class="sm" style="text-align:center;margin:0">${hlMode ? "칠하기 중에는 읽어 주지 않아요" : "글을 누르면 그 줄부터 읽어 줘요"}</p>
     ${hlBar()}
     <section class="card book">${html || `<p class="sm">기출 포인트가 없는 절이에요.</p>`}</section>
     <button class="btn ${done ? "b-green" : "b-acc"}" id="sDone">${done ? "✅ 다 읽은 절이에요" : "✅ 다 읽었어요"}<small>${done ? "누르면 표시를 지워요" : "길잡이가 다음 절로 넘어가요"}</small></button>
-    <button class="btn b-blue" id="sQuiz">✏️ 이 절과 관련된 문제 풀기</button>
+    ${P.n ? `<button class="btn b-blue" id="sQuiz">✏️ 이 절과 관련된 문제 풀기</button>` : ""}
     <button class="btn b-orange" id="sNote">📄 이 절 노트<small>코넬식 · 앱에서 쓰고 A4 PDF로 공유</small></button>
     <div class="g2">${arg.i > 0 ? `<button class="btn b-gray" id="sPrev">‹ 이전 절</button>` : "<span></span>"}${arg.i < P.s.length - 1 ? `<button class="btn b-gray" id="sNextSec">다음 절 ›</button>` : ""}</div>`;
     wireHead({ p: arg.p });
@@ -729,7 +747,7 @@ function viewSection(arg) {
     $("#sDone").onclick = () => { if (done) delete S.done[key]; else S.done[key] = today(); save();
       if (!done) { toast("잘했어요! 👏"); if (arg.i < P.s.length - 1) return go("section", { p: arg.p, i: arg.i + 1 }); } viewSection(arg); };
     $("#sNote").onclick = () => go("nsec", { n: (arg.p + 1) * 100 + arg.i + 1, from: "book" });
-    $("#sQuiz").onclick = () => startW(shuffle(qsForSection(arg.p, arg.i, B)).slice(0, 10), `✏️ ${s.n}절 관련 문제`);
+    $("#sQuiz") && ($("#sQuiz").onclick = () => startW(shuffle(qsForSection(arg.p, arg.i, B)).slice(0, 10), `✏️ ${s.n}절 관련 문제`));
     $("#sPrev")?.addEventListener("click", () => go("section", { p: arg.p, i: arg.i - 1 }));
     $("#sNextSec")?.addEventListener("click", () => go("section", { p: arg.p, i: arg.i + 1 }));
     $("#view").querySelector("[data-back]").onclick = () => arg.from === "msec" ? go("msec") : go("part", { p: arg.p });
@@ -763,7 +781,7 @@ function viewMind() {
   <div id="mHits"></div>
   <button class="btn b-orange" id="mHl">🖍 하이라이트·📝 메모<small>칠한 곳 ${hlCount("m")}개 모아 보기·듣기</small></button>
   <button class="btn b-purple" id="mAll">🎧 마인드맵 전체 듣기<small>처음부터 가지를 차례로 읽어 줘요</small></button>
-  <section class="card">${MM.map((s, i) => `${i === 0 || MM[i - 1].p !== s.p ? `<div class="t" style="margin-top:${i ? 12 : 0}px">제${s.p + 1}과목 ${esc(s.g)}</div>` : ""}<button class="sec" data-n="${s.n}"><span class="n" style="background:${SCOL[i % SCOL.length]};color:#fff">${s.n % 100}</span><b>${esc(s.t)}<br><span class="sm">큰 가지 ${s.c.length}개 · 요점 ${mmCount(s)}개</span></b><span class="sm">›</span></button>`).join("")}</section>
+  <section class="card">${MM.map((s, i) => `${i === 0 || MM[i - 1].p !== s.p ? `<div class="t" style="margin-top:${i ? 12 : 0}px">${s.n < 400 ? `제${s.p + 1}과목 ` : "📌 "}${esc(s.g)}</div>` : ""}<button class="sec" data-n="${s.n}"><span class="n" style="background:${SCOL[i % SCOL.length]};color:#fff">${s.n % 100}</span><b>${esc(s.t)}<br><span class="sm">큰 가지 ${s.c.length}개 · 요점 ${mmCount(s)}개</span></b><span class="sm">›</span></button>`).join("")}</section>
   <p class="sm" style="text-align:center">원본: 전기기능사 필기시험 이론편 마인드맵 PDF</p>`;
   wireHead();
   $("#view").querySelectorAll("[data-n]").forEach(b => b.onclick = () => { mmOpen = new Set(); mmSec = +b.dataset.n; go("msec"); });
@@ -784,7 +802,7 @@ function viewMind() {
   $("#mQ").oninput = e => { mmQ = e.target.value; hits(); };
   hits();
 }
-const MNK = { "설명": ["설명", "#f0fdfa", "#99f6e4", "#0f766e"], "기출 포인트": ["🎯 기출 포인트", "#fef2f2", "#fecaca", "#ef4444"], "쉬운 예": ["💡 쉬운 예", "#eff6ff", "#bfdbfe", "#3b82f6"], "예제": ["✏️ 예제", "#f0fdf4", "#bbf7d0", "#16a34a"], "표": ["📊 표", "#faf5ff", "#e9d5ff", "#9333ea"], "핵심": ["📌 핵심", "#f5f3ff", "#ddd6fe", "#6d28d9"], "공식": ["🧮 공식", "#ecfeff", "#a5f3fc", "#0891b2"] };
+const MNK = { "설명": ["설명", "#f0fdfa", "#99f6e4", "#0f766e"], "기출 포인트": ["🎯 기출 포인트", "#fef2f2", "#fecaca", "#ef4444"], "쉬운 예": ["💡 쉬운 예", "#eff6ff", "#bfdbfe", "#3b82f6"], "예제": ["✏️ 예제", "#f0fdf4", "#bbf7d0", "#16a34a"], "표": ["📊 표", "#faf5ff", "#e9d5ff", "#9333ea"], "핵심": ["📌 핵심", "#f5f3ff", "#ddd6fe", "#6d28d9"], "공식": ["🧮 공식", "#ecfeff", "#a5f3fc", "#0891b2"], "최신 개정": ["🆕 최신 개정", "#f5f3ff", "#ddd6fe", "#7c3aed"] };
 /* 교재의 표를 마인드맵 요점에 붙여 보여 줘요. 누르면 크게 */
 const tblHtml = rows => `<table>${rows.map((r, i) => `<tr>${r.map(c => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table>`;
 const mmTbl = rows => `<div class="mtb" data-tbz>${tblHtml(rows)}<span class="tz">🔍 누르면 크게 보여요</span></div>`;
@@ -1331,13 +1349,13 @@ function tocGroups() {
 }
 function tocCard() {
   if (!window.MM || !MM.length) return "";
-  const sent = S.tocSent ?? TOC.sent ?? "", G = tocGroups(), R = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ";
+  const sent = S.tocSent ?? TOC.sent ?? "", G = tocGroups(), R = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ", TM = MM.filter(s => s.n < 400);
   const cell = (key, txt) => tocHide && !tocShown.has(key) ? `<button class="tocq" data-tq="${esc(key)}">${esc([...txt][0] || "?")}…</button>` : esc(txt);
-  return `<details class="card toc" id="tocBox" ${S.tocOpen === false ? "" : "open"}><summary><b>🧭 전체 목차 외우기</b><span class="sm">${MM.length}${tocUnit()} · 덩어리 ${G.length}개 ▾</span></summary>
+  return `<details class="card toc" id="tocBox" ${S.tocOpen === false ? "" : "open"}><summary><b>🧭 전체 목차 외우기</b><span class="sm">${TM.length}${tocUnit()} · 덩어리 ${G.length}개 ▾</span></summary>
   <div class="tocs">💡 ${sent ? esc(sent) : `<span class="sm">덩어리 첫 글자로 나만의 문장을 만들어 보세요</span>`} <button class="chip" id="tocEd" style="padding:3px 9px">✏️</button></div>
   <table class="toct"><tr><th>덩어리</th><th>${tocUnit()}</th><th>첫 글자</th></tr>${G.map(([g, L]) => `<tr><td><b>${esc(g)}</b></td><td>${L.map(s => cell("s" + s.n, tocShort(s))).join(" · ")}</td><td style="white-space:nowrap">${L.map(s => esc([...tocShort(s)][0])).join("·")}</td></tr>`).join("")}</table>
   <div class="tocsub">${tocUnit()}마다 큰 가지 <span class="sm">(${tocUnit()} 이름을 누르면 그 마인드맵으로 가요)</span></div>
-  <table class="toct">${MM.map(s => `<tr><td style="width:34%"><button class="tocgo" data-tgo="${s.n}">${esc(tocLbl(s))}</button><br>${cell("s" + s.n, tocShort(s))}</td><td>${tocKw(s).map((k, i) => `<span class="tocr">${R[i] || i + 1}</span> ${cell(`k${s.n}.${i}`, k)}`).join("<br>")}</td></tr>`).join("")}</table>
+  <table class="toct">${TM.map(s => `<tr><td style="width:34%"><button class="tocgo" data-tgo="${s.n}">${esc(tocLbl(s))}</button><br>${cell("s" + s.n, tocShort(s))}</td><td>${tocKw(s).map((k, i) => `<span class="tocr">${R[i] || i + 1}</span> ${cell(`k${s.n}.${i}`, k)}`).join("<br>")}</td></tr>`).join("")}</table>
   <div class="g2 mt"><button class="btn ${tocHide ? "b-gray" : "b-purple"}" id="tocHide">${tocHide ? "🙈 가리기 끄기" : "🙈 가려 놓고 떠올리기"}</button>${tocHide ? `<button class="btn b-gray" id="tocAgain">🔄 다시 가리기</button>` : `<button class="btn b-gray" id="tocTip">📅 외우는 순서</button>`}</div>
   ${tocHide ? `<p class="sm" style="margin:8px 0 0">먼저 떠올려 말해 보고, 가려진 칸을 눌러 확인해요. ${tocShown.size ? `확인한 칸 ${tocShown.size}개` : ""}</p>` : ""}
   </details>`;
@@ -1442,11 +1460,12 @@ function openSettings() {
     m.querySelector("#sLoad").onclick = () => { const i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json";
       i.onchange = async () => { try { const j = JSON.parse(await i.files[0].text()); if (j.app !== "elec-study") throw 0;
         if (!confirm(`푼 문제 ${Object.keys(j.q || {}).length}개 기록이 든 백업이에요. 지금 기록을 바꿀까요?`)) return;
-        delete j.app; delete j.savedAt; S = Object.assign(def(), j); S.set = Object.assign(def().set, j.set); save(); close(); go("home"); toast("불러왔어요"); } catch { toast("전기기능사 백업 파일이 아니에요"); } }; i.click(); };
+        delete j.app; delete j.savedAt; S = Object.assign(def(), j); S.set = Object.assign(def().set, j.set); save(); migrateBook(); close(); go("home"); toast("불러왔어요"); } catch { toast("전기기능사 백업 파일이 아니에요"); } }; i.click(); };
     m.querySelector("#sReset").onclick = () => { if (!confirm("푼 기록, 오답, 별표, 카드, 읽은 절 표시를 모두 지울까요?\n(시험일·설정·내 카드는 남아요)")) return; Object.assign(S, { q: {}, star: [], cards: {}, done: {}, day: { d: "", n: 0 }, mocks: [] }); save(); close(); go("home"); toast("기록을 지웠어요"); };
   });
 }
 
+migrateBook();
 if (location.hash.startsWith("#print=")) { go("home"); loadMM().then(() => notePrintPage()); } else go("home");
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
